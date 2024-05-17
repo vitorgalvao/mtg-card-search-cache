@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'net/http'
+require 'pathname'
+
+# Require an argument
+abort 'One argument is required, pointing to the directory where to save data' unless ARGV.count == 1
+
+# Set up file system and data paths
+Cache_dir = Pathname.new(ARGV[0])
+Cache_file = Cache_dir.join('cache.json')
+Cache_dir.mkpath
+
+# Helper to get URL contents
+def download(url)
+  Net::HTTP.get(URI.parse(url))
+end
+
+# Constants
+Image_size = 'normal'.freeze
+Ignored_layouts = %w[art_series double_faced_token scheme token vanguard].freeze
+Multi_faced_layout = %w[modal_dfc transform].freeze
+Rarity_order = %w[mythic rare uncommon common bonus special].freeze
+
+All_cards_info = lambda {
+  data_url = JSON.parse(download('https://api.scryfall.com/bulk-data/oracle-cards'))['download_uri']
+  data = JSON.parse(download(data_url))
+
+  # Sort by rarity
+  data.sort_by { |card_info| Rarity_order.index(card_info['rarity']) }
+}.call
+
+Script_filter_items = All_cards_info.each_with_object([]) do |card_info, items|
+  next if Ignored_layouts.any? { |layout| card_info['layout'] == layout }
+
+  if Multi_faced_layout.any? { |layout| card_info['layout'] == layout } # If card is doube-faced,
+    card = card_info['card_faces'][0] # use info of first face,
+    card['rarity'] = card_info['rarity'] # but rarity is of the whole card, not a face
+    card['scryfall_uri'] = card_info['scryfall_uri']
+  else
+    card = card_info
+  end
+
+  list =
+    if card['mana_cost'].empty? && card['type_line'] =~ /.*Land.*/
+      'Lands'
+    elsif card['colors'].empty?
+      'Colorless'
+    elsif card['colors'].length > 1
+      'Multi'
+    elsif card['colors'].first == 'W'
+      'White'
+    elsif card['colors'].first == 'U'
+      'Blue'
+    elsif card['colors'].first == 'B'
+      'Black'
+    elsif card['colors'].first == 'R'
+      'Red'
+    elsif card['colors'].first == 'G'
+      'Green'
+    end
+
+  pt = card['power'].nil? ? '' : " 𐄁 #{card['power']}/#{card['toughness']}"
+  rulings = card['oracle_text'].nil? || card['oracle_text'].empty? ? '' : " 𐄁 #{card['oracle_text'].gsub("\n", '. ')}"
+  image = card['image_uris'][Image_size].sub(/\?\d+$/, '')
+
+  items.push(
+    variables: {
+      card_name: card['name'],
+      card_url: card['scryfall_uri'].sub('?utm_source=api', ''),
+      image_url: image
+    },
+    title: card['name'],
+    autocomplete: card['name'],
+    subtitle: "#{card['mana_cost']} (#{card['cmc'].to_i}) 𐄁 #{card['type_line']}#{pt} 𐄁 #{card['rarity']}#{rulings}",
+    quicklookurl: image,
+    text: { copy: card['name'] },
+    icon: { path: "images/mtg_symbols/#{list}.png" },
+    arg: 'See variables'
+  )
+end
+
+Cache_file.write({ cache: { seconds: 86400, loosereload: true }, items: Script_filter_items }.to_json)
