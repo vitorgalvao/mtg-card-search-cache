@@ -13,6 +13,7 @@ jobs:
     env:
       GEM_HOME: ~/gems
       DATA_DIR: ~/data-cache
+      NEW_DIR: ${{ github.workspace }}/data-cache
       PACKAGE: ~/data.tgz
     steps:
     - name: Check out repository
@@ -21,6 +22,9 @@ jobs:
         persist-credentials: false
     - name: Fetch and compress data
       run: |
+        echo "${DATA_DIR}"
+        echo "${NEW_DIR}"
+        echo ${HOME}"
         ./fetch-data "${DATA_DIR}"
         tar --directory "${DATA_DIR}" --create --gzip --file "${PACKAGE}" .
     - name: Release
