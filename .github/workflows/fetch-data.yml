@@ -22,9 +22,9 @@ jobs:
         persist-credentials: false
     - name: Fetch and compress data
       run: |
-        echo "${DATA_DIR}"
-        echo "${NEW_DIR}"
-        echo ${HOME}"
+        echo "AAA ${DATA_DIR}"
+        echo "BBB ${NEW_DIR}"
+        echo "CCC ${HOME}"
         ./fetch-data "${DATA_DIR}"
         tar --directory "${DATA_DIR}" --create --gzip --file "${PACKAGE}" .
     - name: Release
