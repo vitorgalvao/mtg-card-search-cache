@@ -3,6 +3,7 @@
 require 'json'
 require 'net/http'
 require 'pathname'
+require 'stringio'
 
 # Require an argument
 abort 'One argument is required, pointing to the directory where to save data' unless ARGV.count == 1
@@ -24,8 +25,9 @@ Multi_faced_layout = %w[modal_dfc transform].freeze
 Rarity_order = %w[mythic rare uncommon common bonus special].freeze
 
 All_cards_info = lambda {
-  data_url = JSON.parse(download('https://api.scryfall.com/bulk-data/oracle-cards'))['download_uri']
-  data = JSON.parse(download(data_url))
+  data_url = JSON.parse(download('https://api.scryfall.com/bulk-data/oracle-cards'))['jsonl_download_uri']
+  data_gzip = download(data_url)
+  data = Zlib::GzipReader.new(StringIO.new(data_gzip)).each_line.map { |line| JSON.parse(line) }
 
   # Sort by rarity
   data.sort_by { |card_info| Rarity_order.index(card_info['rarity']) }
